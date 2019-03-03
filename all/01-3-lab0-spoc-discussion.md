@@ -18,7 +18,7 @@
 
 - 你理解的对于类似ucore这样需要进程/虚存/文件系统的操作系统，在硬件设计上至少需要有哪些直接的支持？至少应该提供哪些功能的特权指令？
 
-  进程需要在内存里维护进程表以及进程的上下文信息，虚存则要求硬件实现动态地址映射以支持分页系统，文件系统需要实现内存保护和I/O，要求硬件支持外设/硬盘和内存之间的换页。
+  进程需要在内存里维护进程表以及进程的上下文信息，并且需要硬件支持时钟中断；虚存则要求硬件实现动态地址映射以支持分页系统；文件系统需要实现内存保护和I/O，要求硬件支持外设/硬盘和内存之间的换页以及存储介质的可靠性。
 
   操作系统至少需要这些特权指令。
 
@@ -65,6 +65,8 @@
  };
 ```
 
+结构体中的":"是C语言的一种特性"位域"，代表着其占用了几位2进制位。
+
 - 对于如下的代码段，
 
 ```
@@ -88,19 +90,49 @@ SETGATE(intr, 1,2,3,0);
 ```
 请问执行上述指令后， intr的值是多少？
 
+unsigned 是32位的，实际上这里应该是把inst看作是gatedesc的指针，即对其指向的地址的接下来64位进行运算。
+
+由代码段我们知道：
+
+1. gd_off_15_0 = 0x0003
+2. gd_ss = 0x0002
+3. gd_args, gd_rsv1 -> 0x00
+4. gd_type = STS_TG32 = 0xF
+5. (gd_s, gd_dp1, gd_p) = 0x1
+6. gd_off_31_16 = 0x0000
+
+其中，gd_off_15_0以及gd_ss是在前32位（即inst指向的地址的取值），由于是小端模式存放，因此gd_off_15_0 在intr的低16位，gd_ss在高16位，由此可以得知intr在执行完该指令后值为0x20003。
+
 ### 课堂实践练习
 
 #### 练习一
 
 1. 请在ucore中找一段你认为难度适当的AT&T格式X86汇编代码，尝试解释其含义。
 
-   
+   ```asm
+   static inline void
+   lgdt(struct pseudodesc *pd) {
+       asm volatile ("lgdt (%0)" :: "r" (pd));
+       asm volatile ("movw %%ax, %%gs" :: "a" (USER_DS));
+       asm volatile ("movw %%ax, %%fs" :: "a" (USER_DS));
+       asm volatile ("movw %%ax, %%es" :: "a" (KERNEL_DS));
+       asm volatile ("movw %%ax, %%ds" :: "a" (KERNEL_DS));
+       asm volatile ("movw %%ax, %%ss" :: "a" (KERNEL_DS));
+       // reload cs
+       asm volatile ("ljmp %0, $1f\n 1:\n" :: "i" (KERNEL_CS));
+   }
+   ```
 
 2. (option)请在rcore中找一段你认为难度适当的RV汇编代码，尝试解释其含义。
 
 #### 练习二
 
 宏定义和引用在内核代码中很常用。请枚举ucore或rcore中宏定义的用途，并举例描述其含义。
+
+1. 可以利用宏进行复杂数据结构的数据访问
+
+2. 可以利用宏进行数据类型转换，如to_struct
+3. 可以将常用功能的代码片段优化，如 ROUNDDOWN, SetPageDirty
 
 #### reference
  - [Intel格式和AT&T格式汇编区别](http://www.cnblogs.com/hdk1993/p/4820353.html)
