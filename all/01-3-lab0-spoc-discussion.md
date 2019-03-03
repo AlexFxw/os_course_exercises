@@ -109,7 +109,7 @@ unsigned 是32位的，实际上这里应该是把inst看作是gatedesc的指针
 
 1. 请在ucore中找一段你认为难度适当的AT&T格式X86汇编代码，尝试解释其含义。
 
-   ```asm
+   ```c
    static inline void
    lgdt(struct pseudodesc *pd) {
        asm volatile ("lgdt (%0)" :: "r" (pd));
@@ -118,10 +118,12 @@ unsigned 是32位的，实际上这里应该是把inst看作是gatedesc的指针
        asm volatile ("movw %%ax, %%es" :: "a" (KERNEL_DS));
        asm volatile ("movw %%ax, %%ds" :: "a" (KERNEL_DS));
        asm volatile ("movw %%ax, %%ss" :: "a" (KERNEL_DS));
-       // reload cs
+       //将ax寄存器的值赋给相应的寄存器，"a"表示限定是某些寄存器(如eax)，后面USER_DS/KERNEL_DS是其代表的变量含义
        asm volatile ("ljmp %0, $1f\n 1:\n" :: "i" (KERNEL_CS));
    }
    ```
+
+   这一段代码首先加载了global descriptor table到寄存器里（lgdt），接着重置了内核的数据/代码的段寄存器。
 
 2. (option)请在rcore中找一段你认为难度适当的RV汇编代码，尝试解释其含义。
 
